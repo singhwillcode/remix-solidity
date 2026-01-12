@@ -1,0 +1,9 @@
+{
+  "name": "Volatile Avatar #0",
+  "description": "State 0: The Calm Base Form. Markets are stable.",
+  "image": "ipfs://QmBaseDummyHash",
+  "attributes": [
+    { "trait_type": "Mood", "value": "Base" },
+    { "trait_type": "Market Status", "value": "Stable" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+    "name": "Volatile Avatar #2",
+    "description": "State 2: Ultra Instinct. Peak Volatility reached.",
+    "image": "ipfs://QmUltraDummyHash",
+    "attributes": [
+        {
+            "trait_type": "Mood",
+            "value": "Ultra Instinct"
+        },
+        {
+            "trait_type": "Market Status",
+            "value": "Volatile"
+        }
+    ]
+}
