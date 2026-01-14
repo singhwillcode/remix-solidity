@@ -2,35 +2,58 @@
 import { useReadContract } from 'wagmi';
 import { CONTRACT_CONFIG } from '@/constants/contracts';
 import { formatUnits } from 'viem';
+import { useState, useEffect } from 'react';
 
 export function Dashboard() {
-    // Read Price
-    const { data: priceData, isError: isPriceError, isLoading: isPriceLoading } = useReadContract({
-        ...CONTRACT_CONFIG,
-        functionName: 'currentPrice',
+    // Live Oracle Address (Sepolia ETH/USD)
+    const ORACLE_ADDRESS = '0x694AA1769357215DE4FAC081bf1f309aDC325306';
+
+    const [lastChecked, setLastChecked] = useState<string>(new Date().toLocaleTimeString());
+
+    // Read Price from Chainlink Direct
+    const { data: roundData, isLoading: isPriceLoading, refetch } = useReadContract({
+        address: ORACLE_ADDRESS,
+        abi: CONTRACT_CONFIG.abi,
+        functionName: 'latestRoundData',
     });
 
-    // Read Mod State
-    const { data: modStateData, isError: isModError, isLoading: isModLoading } = useReadContract({
-        ...CONTRACT_CONFIG,
-        functionName: 'getModState',
-    });
+    // Manual Polling to ensure updates
+    useEffect(() => {
+        const interval = setInterval(() => {
+            console.log("Refetching Price...");
+            refetch();
+            setLastChecked(new Date().toLocaleTimeString());
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [refetch]);
 
-    // Helper to format price (assuming 8 decimals from Oracle)
+    const priceData = roundData ? (roundData as any)[1] : null;
+
+    // Helper to format price (8 decimals)
     const formattedPrice = priceData
         ? `$${(Number(priceData) / 1e8).toFixed(2)}`
         : '0.00';
 
-    // Helper for Mood
-    const getMood = (state: any) => {
-        const s = Number(state);
-        if (s === 0) return { text: "Base Form", color: "text-blue-400" };
-        if (s === 1) return { text: "Super Saiyan", color: "text-yellow-400" };
-        if (s === 2) return { text: "Ultra Instinct", color: "text-white" };
-        return { text: "Unknown", color: "text-gray-400" };
+    // Calculate Mood locally based on live price
+    // Contract Logic: (Price / 100) % 3
+    const calculateModState = (price: any) => {
+        if (!price) return -1;
+        const adjustedPrice = Number(price) / 1e8;
+        const integerPrice = Math.floor(adjustedPrice);
+        return Math.floor(integerPrice / 100) % 3;
     };
 
-    const mood = getMood(modStateData);
+    const currentModState = calculateModState(priceData);
+
+    // Helper for Mood
+    const getMood = (state: number) => {
+        if (state === 0) return { text: "Base Form", color: "text-blue-400" };
+        if (state === 1) return { text: "Super Saiyan", color: "text-yellow-400" };
+        if (state === 2) return { text: "Ultra Instinct", color: "text-white" };
+        return { text: "Loading...", color: "text-gray-400" };
+    };
+
+    const mood = getMood(currentModState);
 
     return (
         <div className="flex flex-col items-center justify-center p-8 bg-gray-900/50 rounded-2xl border border-gray-800 backdrop-blur-sm transition-all w-full max-w-sm">
@@ -41,11 +64,12 @@ export function Dashboard() {
                     <p className="text-3xl font-mono text-white mt-1">
                         {isPriceLoading ? "..." : formattedPrice}
                     </p>
+                    <p className="text-[10px] text-gray-600 mt-2">Last Checked: {lastChecked}</p>
                 </div>
                 <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
                     <p className="text-gray-400 text-xs uppercase tracking-widest">Current Mode</p>
                     <p className={`text-2xl font-bold mt-1 ${mood.color}`}>
-                        {isModLoading ? "..." : mood.text}
+                        {isPriceLoading ? "..." : mood.text}
                     </p>
                 </div>
             </div>

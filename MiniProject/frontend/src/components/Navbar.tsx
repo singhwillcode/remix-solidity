@@ -1,8 +1,23 @@
-'use client';
-
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { useEffect, useState } from 'react';
+import { sepolia } from 'wagmi/chains';
+
+function ChainChecker() {
+    const { chainId } = useAccount();
+    const { switchChain } = useSwitchChain();
+
+    if (chainId === sepolia.id) return null;
+
+    return (
+        <button
+            onClick={() => switchChain({ chainId: sepolia.id })}
+            className="px-3 py-1 bg-yellow-600 rounded text-xs font-bold hover:bg-yellow-700 transition"
+        >
+            Wrong Network (Switch to Sepolia)
+        </button>
+    );
+}
 
 export function Navbar() {
     const { address, isConnected } = useAccount();
@@ -25,6 +40,7 @@ export function Navbar() {
             <div>
                 {isConnected ? (
                     <div className="flex gap-4 items-center">
+                        <ChainChecker />
                         <span className="text-sm text-gray-400 font-mono">
                             {address?.slice(0, 6)}...{address?.slice(-4)}
                         </span>

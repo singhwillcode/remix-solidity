@@ -3,19 +3,16 @@ import { useReadContract } from 'wagmi';
 import { CONTRACT_CONFIG } from '@/constants/contracts';
 import { useState, useEffect } from 'react';
 
-// Simplified IPFS Gateway
 const toGateway = (uri: string) => {
     if (!uri) return "";
-    if (uri.startsWith('ipfs://')) {
-        return uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
-    }
+    if (uri.startsWith('http://') || uri.startsWith('https://')) return uri;
+    if (uri.startsWith('ipfs://')) return uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    if (uri.startsWith('Qm') || uri.startsWith('baf')) return `https://ipfs.io/ipfs/${uri}`;
     return uri;
 }
 
 export function NFTCard() {
-    // Hardcoded Token ID 1 for demo (since we loop update all)
     const tokenId = BigInt(1);
-
     const { data: tokenURI, isLoading } = useReadContract({
         ...CONTRACT_CONFIG,
         functionName: 'tokenURI',
@@ -25,12 +22,37 @@ export function NFTCard() {
     const [metadata, setMetadata] = useState<any>(null);
 
     useEffect(() => {
+        let isMounted = true;
+
         if (tokenURI) {
             const url = toGateway(tokenURI as string);
-            fetch(url)
-                .then(res => res.json())
-                .then(data => setMetadata(data))
-                .catch(err => console.error("Metadata fetch error", err));
+            console.log("Fetching:", url);
+
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 8000);
+
+            fetch(url, { signal: controller.signal })
+                .then(r => r.ok ? r.text() : Promise.reject())
+                .then(text => {
+                    try {
+                        return JSON.parse(text);
+                    } catch {
+                        return { name: "Raw", description: "Not JSON", image: url };
+                    }
+                })
+                .then(data => isMounted && setMetadata(data))
+                .catch(() => isMounted && setMetadata({
+                    name: "Error",
+                    description: "Failed to load. Use Admin Panel to update URI.",
+                    image: ""
+                }))
+                .finally(() => clearTimeout(timer));
+
+            return () => {
+                isMounted = false;
+                controller.abort();
+                clearTimeout(timer);
+            };
         }
     }, [tokenURI]);
 
@@ -40,7 +62,7 @@ export function NFTCard() {
 
             <div className="w-64 h-64 bg-gray-800 rounded-xl flex items-center justify-center mb-6 overflow-hidden border border-gray-700 relative">
                 {isLoading ? (
-                    <span className="animate-pulse text-gray-500">Loading Chain Data...</span>
+                    <span className="animate-pulse text-gray-500">Loading...</span>
                 ) : metadata?.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -50,15 +72,17 @@ export function NFTCard() {
                     />
                 ) : (
                     <div className="text-center p-4">
-                        <p className="text-gray-500 text-sm">No Data</p>
-                        <p className="text-xs text-gray-600 mt-2">Mint simple token #1 to view</p>
+                        <p className="text-gray-500 text-sm">No Image</p>
+                        <p className="text-xs text-gray-600 mt-2">Use Admin Panel to set URI</p>
                     </div>
                 )}
             </div>
 
             <div className="text-center">
                 <p className="text-blue-400 font-semibold">{metadata?.name || "???"}</p>
-                <p className="text-gray-500 text-xs mt-1">{metadata?.description || "Waiting for sync..."}</p>
+                <p className="text-gray-500 text-xs mt-1">{metadata?.description || "..."}</p>
+
+
             </div>
         </div>
     );
